@@ -8,7 +8,8 @@
 
 <p align="center">
   <strong>Debloat, optimize, and set up your fresh Ubuntu install in one command.</strong><br>
-  No more wasting hours configuring after every reinstall.
+  No more wasting hours configuring after every reinstall.<br>
+  <em>Fully non-interactive — zero keyboard input required during setup.</em>
 </p>
 
 ---
@@ -43,7 +44,8 @@ sudo bash setup.sh
 | **4** | ⚡ **Optimize** | Kernel tweaks, GNOME perf, GRUB speedup, preload |
 | **5** | 🛠️ **Dev Tools** | git, curl, htop, build-essential, vim, jq, etc. |
 | **6** | 🔒 **Firewall** | UFW configured (deny in, allow out, SSH open) |
-| **7** | 🧹 **Cleanup** | Autoremove, cache clean, journal trim |
+| **7** | 📶 **WiFi Fix** | Disable WiFi power saving permanently (auto-detect interface) |
+| **8** | 🧹 **Cleanup** | Autoremove, cache clean, journal trim |
 
 ---
 
@@ -113,6 +115,15 @@ net.ipv4.tcp_fastopen=3                  # Faster TCP connections
 ### Preload
 - Learns your most-used apps and preloads them into memory for faster launch
 
+### WiFi Power Saving
+- Auto-detects wireless interface (works with `wlan0`, `wlp*`, etc.)
+- Disables WiFi power management immediately and permanently
+- Uses **3 layers** of persistence:
+  1. NetworkManager dispatcher script (`/etc/NetworkManager/dispatcher.d/`)
+  2. NetworkManager config (`/etc/NetworkManager/conf.d/99-wifi-powersave-off.conf`)
+  3. Immediate `iwconfig`/`iw` command on current session
+- Gracefully skips if no wireless interface is detected
+
 ---
 
 ## 🛠️ Dev Tools Installed
@@ -147,6 +158,18 @@ oneclick/
 
 ---
 
+## 🤖 Non-Interactive Mode
+
+The entire script runs **fully unattended** — no keyboard interaction needed during installation or upgrades:
+
+- `DEBIAN_FRONTEND=noninteractive` — suppresses all apt/dpkg prompts
+- `NEEDRESTART_MODE=a` — auto-restarts services without asking
+- `--force-confdef --force-confold` — keeps existing config files during upgrades
+
+This makes it safe to run via SSH, scripts, or automation tools without getting stuck on interactive prompts.
+
+---
+
 ## ⚙️ Requirements
 
 - **OS:** Ubuntu 20.04 / 22.04 / 24.04+ (Desktop)
@@ -171,6 +194,12 @@ Want to modify what gets installed or removed? Edit `setup.sh`:
 
 **Q: Is it safe to run?**
 > Yes. The script asks for confirmation before starting and only removes packages that are safe to remove. A GRUB backup is created before modification.
+
+**Q: Does it require any keyboard input during installation?**
+> No. After the initial confirmation prompt, everything runs fully non-interactive. No more pressing Enter or typing 'y' during package installs.
+
+**Q: What about WiFi performance issues?**
+> The script automatically detects your wireless interface and disables power saving, which is a common cause of WiFi lag/disconnects on Linux.
 
 **Q: Can I run it multiple times?**
 > Yes. The script checks if packages are already installed/removed and skips them.

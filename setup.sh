@@ -16,10 +16,18 @@
 #   3. Discord Auto-Start on login
 #   4. System Optimization - Kernel tweaks, GNOME perf, GRUB, firewall
 #   5. Essential Dev Tools
-#   6. Final Cleanup
+#   6. Firewall Setup
+#   7. WiFi Power Saving Disable
+#   8. Final Cleanup
 # ============================================================================
 
 set -euo pipefail
+
+# ── Non-interactive mode ─────────────────────────────────────────────────────
+# Prevent all interactive prompts from apt/dpkg during install/upgrade
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+apt_options=(-y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold")
 
 # ── Colors & Formatting ─────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -77,7 +85,8 @@ preflight() {
     echo -e "  ${CYAN}4.${NC} Optimize system performance (kernel, GNOME, GRUB)"
     echo -e "  ${CYAN}5.${NC} Install essential dev tools"
     echo -e "  ${CYAN}6.${NC} Configure firewall (UFW)"
-    echo -e "  ${CYAN}7.${NC} Clean up & free disk space"
+    echo -e "  ${CYAN}7.${NC} Disable WiFi power saving"
+    echo -e "  ${CYAN}8.${NC} Clean up & free disk space"
     echo ""
 
     read -rp "$(echo -e "${BOLD}Continue? [y/N]: ${NC}")" confirm
@@ -89,7 +98,7 @@ preflight() {
 
 # ── 1. Debloat ───────────────────────────────────────────────────────────────
 debloat() {
-    log_header "STEP 1/7 — DEBLOATING UBUNTU"
+    log_header "STEP 1/8 — DEBLOATING UBUNTU"
 
     # Packages to remove (safe to remove, won't break desktop)
     local bloat_packages=(
@@ -146,7 +155,7 @@ debloat() {
     log_step "Removing bloatware packages..."
     for pkg in "${bloat_packages[@]}"; do
         if dpkg -l | grep -q "^ii.*${pkg}" 2>/dev/null; then
-            apt-get remove --purge -y "$pkg" 2>/dev/null && \
+            apt-get remove --purge "${apt_options[@]}" "$pkg" 2>/dev/null && \
                 log_success "Removed: ${pkg}" || \
                 log_warning "Could not remove: ${pkg}"
         fi
@@ -180,7 +189,7 @@ debloat() {
 
 # ── 2. Install Applications ─────────────────────────────────────────────────
 install_apps() {
-    log_header "STEP 2/7 — INSTALLING APPLICATIONS"
+    log_header "STEP 2/8 — INSTALLING APPLICATIONS"
 
     # Update repos first
     log_step "Updating package lists..."
@@ -190,7 +199,7 @@ install_apps() {
     log_step "Installing Google Chrome..."
     if ! command -v google-chrome &>/dev/null; then
         wget -q -O /tmp/chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-        apt-get install -y /tmp/chrome.deb
+        apt-get install "${apt_options[@]}" /tmp/chrome.deb
         rm -f /tmp/chrome.deb
         log_success "Google Chrome installed"
     else
@@ -210,7 +219,7 @@ install_apps() {
     log_step "Installing Discord..."
     if ! command -v discord &>/dev/null; then
         wget -q -O /tmp/discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-        apt-get install -y /tmp/discord.deb
+        apt-get install "${apt_options[@]}" /tmp/discord.deb
         rm -f /tmp/discord.deb
         log_success "Discord installed"
     else
@@ -231,7 +240,7 @@ install_apps() {
 
 # ── 3. Discord Auto-Start ────────────────────────────────────────────────────
 setup_discord_autostart() {
-    log_header "STEP 3/7 — DISCORD AUTO-START"
+    log_header "STEP 3/8 — DISCORD AUTO-START"
 
     local autostart_dir="${REAL_HOME}/.config/autostart"
     mkdir -p "$autostart_dir"
@@ -257,7 +266,7 @@ EOF
 
 # ── 4. System Optimization ──────────────────────────────────────────────────
 optimize_system() {
-    log_header "STEP 4/7 — SYSTEM OPTIMIZATION"
+    log_header "STEP 4/8 — SYSTEM OPTIMIZATION"
 
     # ── Kernel / sysctl tweaks ───────────────────────────────────────────
     log_step "Applying kernel performance tweaks..."
@@ -335,7 +344,7 @@ EOF
     # ── Preload (frequently used apps load faster) ───────────────────────
     log_step "Installing preload for faster app launches..."
     if ! command -v preload &>/dev/null; then
-        apt-get install -y preload &>/dev/null
+        apt-get install "${apt_options[@]}" preload &>/dev/null
         systemctl enable preload &>/dev/null
         log_success "Preload installed & enabled"
     else
@@ -347,7 +356,7 @@ EOF
 
 # ── 5. Install Dev Tools ────────────────────────────────────────────────────
 install_dev_tools() {
-    log_header "STEP 5/7 — ESSENTIAL DEV TOOLS"
+    log_header "STEP 5/8 — ESSENTIAL DEV TOOLS"
 
     local dev_packages=(
         git
@@ -371,7 +380,7 @@ install_dev_tools() {
     )
 
     log_step "Installing essential tools..."
-    apt-get install -y "${dev_packages[@]}" &>/dev/null
+    apt-get install "${apt_options[@]}" "${dev_packages[@]}" &>/dev/null
 
     for pkg in "${dev_packages[@]}"; do
         if dpkg -l "$pkg" &>/dev/null; then
@@ -393,12 +402,12 @@ install_dev_tools() {
 
 # ── 6. Firewall Setup ───────────────────────────────────────────────────────
 setup_firewall() {
-    log_header "STEP 6/7 — FIREWALL (UFW)"
+    log_header "STEP 6/8 — FIREWALL (UFW)"
 
     log_step "Configuring UFW firewall..."
 
     if ! command -v ufw &>/dev/null; then
-        apt-get install -y ufw &>/dev/null
+        apt-get install "${apt_options[@]}" ufw &>/dev/null
     fi
 
     ufw default deny incoming &>/dev/null
@@ -413,16 +422,96 @@ setup_firewall() {
     log_success "Firewall enabled (deny incoming, allow outgoing, SSH allowed)"
 }
 
-# ── 7. Cleanup ───────────────────────────────────────────────────────────────
+# ── 7. Disable WiFi Power Saving ─────────────────────────────────────────────
+disable_wifi_powersave() {
+    log_header "STEP 7/8 — DISABLE WIFI POWER SAVING"
+
+    # Auto-detect wireless interface
+    local wifi_iface
+    wifi_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{print $2}' | head -1)
+
+    if [[ -z "$wifi_iface" ]]; then
+        # Fallback: try /sys/class/net
+        for iface in /sys/class/net/*; do
+            if [[ -d "${iface}/wireless" ]]; then
+                wifi_iface=$(basename "$iface")
+                break
+            fi
+        done
+    fi
+
+    if [[ -z "$wifi_iface" ]]; then
+        log_warning "No wireless interface detected, skipping WiFi power saving config"
+        return 0
+    fi
+
+    log_info "Detected wireless interface: ${wifi_iface}"
+
+    # Disable power saving immediately
+    log_step "Disabling WiFi power saving on ${wifi_iface}..."
+    if command -v iwconfig &>/dev/null; then
+        iwconfig "$wifi_iface" power off 2>/dev/null && \
+            log_success "WiFi power saving disabled (immediate)" || \
+            log_warning "Could not disable power saving immediately (iwconfig)"
+    elif command -v iw &>/dev/null; then
+        iw dev "$wifi_iface" set power_save off 2>/dev/null && \
+            log_success "WiFi power saving disabled (immediate)" || \
+            log_warning "Could not disable power saving immediately (iw)"
+    fi
+
+    # Make it permanent via NetworkManager dispatcher script
+    log_step "Making WiFi power saving disable permanent..."
+    local nm_dispatcher_dir="/etc/NetworkManager/dispatcher.d"
+    if [[ -d "$(dirname "$nm_dispatcher_dir")" ]]; then
+        mkdir -p "$nm_dispatcher_dir"
+        cat > "${nm_dispatcher_dir}/99-wifi-powersave-off" <<'DISPATCHER_EOF'
+#!/usr/bin/env bash
+# Disable WiFi power saving on interface up
+# Installed by OneClick setup script
+
+INTERFACE="$1"
+ACTION="$2"
+
+if [[ "$ACTION" == "up" ]]; then
+    # Check if this is a wireless interface
+    if [[ -d "/sys/class/net/${INTERFACE}/wireless" ]]; then
+        /usr/sbin/iwconfig "$INTERFACE" power off 2>/dev/null || \
+        /usr/sbin/iw dev "$INTERFACE" set power_save off 2>/dev/null
+    fi
+fi
+DISPATCHER_EOF
+        chmod 755 "${nm_dispatcher_dir}/99-wifi-powersave-off"
+        log_success "NetworkManager dispatcher script installed"
+    fi
+
+    # Also set via NetworkManager config (belt and suspenders)
+    local nm_conf_dir="/etc/NetworkManager/conf.d"
+    mkdir -p "$nm_conf_dir"
+    cat > "${nm_conf_dir}/99-wifi-powersave-off.conf" <<'NM_CONF_EOF'
+[connection]
+wifi.powersave = 2
+NM_CONF_EOF
+    log_success "NetworkManager config set (wifi.powersave = 2 = disabled)"
+
+    # Restart NetworkManager to apply
+    if systemctl is-active NetworkManager &>/dev/null; then
+        systemctl restart NetworkManager 2>/dev/null
+        log_success "NetworkManager restarted to apply changes"
+    fi
+
+    log_success "WiFi power saving permanently disabled for all wireless interfaces!"
+}
+
+# ── 8. Cleanup ───────────────────────────────────────────────────────────────
 cleanup() {
-    log_header "STEP 7/7 — CLEANUP & DISK SPACE"
+    log_header "STEP 8/8 — CLEANUP & DISK SPACE"
 
     log_step "Removing unused packages..."
-    apt-get autoremove --purge -y &>/dev/null
+    apt-get autoremove --purge "${apt_options[@]}" &>/dev/null
     log_success "Autoremove complete"
 
     log_step "Cleaning apt cache..."
-    apt-get autoclean -y &>/dev/null
+    apt-get autoclean "${apt_options[@]}" &>/dev/null
     apt-get clean &>/dev/null
     log_success "Apt cache cleaned"
 
@@ -451,6 +540,7 @@ show_summary() {
     echo -e "  ${GREEN}✔${NC} System optimized (kernel, GNOME, GRUB)"
     echo -e "  ${GREEN}✔${NC} Dev tools installed"
     echo -e "  ${GREEN}✔${NC} Firewall configured"
+    echo -e "  ${GREEN}✔${NC} WiFi power saving disabled"
     echo -e "  ${GREEN}✔${NC} Disk cleaned up"
     echo ""
     echo -e "  ${YELLOW}${BOLD}⚡ Recommended: Reboot your system now!${NC}"
@@ -477,7 +567,7 @@ main() {
     echo "| (_) | .\` | _| (__| |__ | | (__| ' < "
     echo " \\___/|_|\\_|___\\___|____|___\\___|_|\\_\\"
     echo ""
-    echo -e "  Ubuntu One-Click Setup Script v1.0${NC}"
+    echo -e "  Ubuntu One-Click Setup Script v1.1${NC}"
     echo ""
 
     preflight
@@ -488,6 +578,7 @@ main() {
     optimize_system
     install_dev_tools
     setup_firewall
+    disable_wifi_powersave
     cleanup
     show_summary
 }
