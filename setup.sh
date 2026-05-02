@@ -53,6 +53,33 @@ log_warning() { echo -e "${YELLOW}[⚠]${NC}      $1"; }
 log_error()   { echo -e "${RED}[✘]${NC}      $1"; }
 log_step()    { echo -e "${CYAN}[→]${NC}      $1"; }
 
+# ── Snap Install with Retry ──────────────────────────────────────────────────
+# Usage: snap_install_retry <snap_name> [max_retries]
+# Retries snap install up to N times (default 3) with delay between attempts.
+# Returns 0 on success, 1 on failure (does NOT exit the script).
+snap_install_retry() {
+    local snap_name="$1"
+    local max_retries="${2:-3}"
+    local attempt=1
+
+    while [[ $attempt -le $max_retries ]]; do
+        log_info "Snap install attempt ${attempt}/${max_retries} for ${snap_name}..."
+        log_info "Snap may download large dependencies (this can take several minutes, please wait)..."
+        if snap install "$snap_name" 2>&1; then
+            return 0
+        fi
+
+        if [[ $attempt -lt $max_retries ]]; then
+            log_warning "Snap install failed for ${snap_name}, retrying in 10 seconds..."
+            sleep 10
+        fi
+        ((attempt++))
+    done
+
+    log_error "Failed to install ${snap_name} after ${max_retries} attempts (network issue?). Skipping."
+    return 1
+}
+
 # ── Pre-flight Checks ───────────────────────────────────────────────────────
 preflight() {
     log_header "PRE-FLIGHT CHECKS"
@@ -209,9 +236,10 @@ install_apps() {
     # ── Telegram ─────────────────────────────────────────────────────────
     log_step "Installing Telegram Desktop..."
     if ! snap list telegram-desktop &>/dev/null; then
-        log_info "Snap may download large dependencies (this can take several minutes, please wait)..."
-        snap install telegram-desktop
-        log_success "Telegram Desktop installed (snap)"
+        snap_install_retry telegram-desktop || true
+        if snap list telegram-desktop &>/dev/null; then
+            log_success "Telegram Desktop installed (snap)"
+        fi
     else
         log_info "Telegram already installed, skipping"
     fi
@@ -230,9 +258,10 @@ install_apps() {
     # ── Termius ──────────────────────────────────────────────────────────
     log_step "Installing Termius..."
     if ! snap list termius-app &>/dev/null; then
-        log_info "Snap may download large dependencies (this can take several minutes, please wait)..."
-        snap install termius-app
-        log_success "Termius installed (snap)"
+        snap_install_retry termius-app || true
+        if snap list termius-app &>/dev/null; then
+            log_success "Termius installed (snap)"
+        fi
     else
         log_info "Termius already installed, skipping"
     fi
