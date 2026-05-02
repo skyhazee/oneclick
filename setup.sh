@@ -209,6 +209,7 @@ install_apps() {
     # ── Telegram ─────────────────────────────────────────────────────────
     log_step "Installing Telegram Desktop..."
     if ! snap list telegram-desktop &>/dev/null; then
+        log_info "Snap may download large dependencies (this can take several minutes, please wait)..."
         snap install telegram-desktop
         log_success "Telegram Desktop installed (snap)"
     else
@@ -229,6 +230,7 @@ install_apps() {
     # ── Termius ──────────────────────────────────────────────────────────
     log_step "Installing Termius..."
     if ! snap list termius-app &>/dev/null; then
+        log_info "Snap may download large dependencies (this can take several minutes, please wait)..."
         snap install termius-app
         log_success "Termius installed (snap)"
     else
